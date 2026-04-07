@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Listening Dashboard — SotaTek</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f1f5f9; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1e293b; }
+
+  .header {
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    padding: 36px 40px;
+    color: white;
+  }
+  .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 10px; }
+  .header .meta { font-size: 14px; opacity: 0.85; display: flex; gap: 20px; flex-wrap: wrap; }
+  .header .meta span { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; }
+
+  .container { max-width: 1160px; margin: 0 auto; padding: 24px 20px; }
+
+  /* Summary Cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px 22px; }
+  .card-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .card-value { font-size: 32px; font-weight: 700; color: #1e3a5f; }
+  .card-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .card-pos .card-value { color: #16a34a; }
+  .card-neg .card-value { color: #dc2626; }
+  .card-neu .card-value { color: #2563eb; }
+
+  /* Section Headers */
+  .section-title { font-size: 15px; font-weight: 600; color: #1e3a5f; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px; }
+
+  /* 2-col & 3-col layouts */
+  .row-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .row-2-equal { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+
+  /* Chart containers */
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap-sm { position: relative; height: 200px; }
+
+  /* Source Ranked List */
+  .source-list { display: flex; flex-direction: column; gap: 8px; }
+  .source-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .rank { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #475569; flex-shrink: 0; }
+  .rank.gold { background: #fbbf24; color: white; }
+  .rank.silver { background: #94a3b8; color: white; }
+  .rank.bronze { background: #b45309; color: white; }
+  .source-name { width: 120px; flex-shrink: 0; color: #334155; font-weight: 500; }
+  .bar-track { flex: 1; background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2563eb, #60a5fa); }
+  .bar-fill-green { background: linear-gradient(90deg, #16a34a, #4ade80); }
+  .buzz-num { width: 50px; text-align: right; font-size: 12px; color: #64748b; font-weight: 600; }
+
+  /* Keyword Tags */
+  .keyword-section { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px; }
+  .keyword-group { margin-bottom: 16px; }
+  .keyword-group h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; text-decoration: none; transition: transform 0.2s; }
+  .tag:hover { transform: scale(1.05); }
+  .tag-pos { background: #dcfce7; color: #15803d; }
+  .tag-neg { background: #fee2e2; color: #991b1b; }
+  .tag-trend { background: #dbeafe; color: #1d4ed8; }
+  .tag-lg { font-size: 15px; padding: 7px 14px; }
+  .tag-xl { font-size: 17px; padding: 8px 16px; }
+
+  /* News List */
+  .news-list { display: flex; flex-direction: column; gap: 14px; }
+  .news-item { background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .news-rank { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #475569; flex-shrink: 0; }
+  .news-rank.top3 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; }
+  .news-content { flex: 1; }
+  .news-title { font-size: 14px; font-weight: 600; color: #1e3a5f; text-decoration: none; line-height: 1.4; display: block; margin-bottom: 6px; }
+  .news-title:hover { color: #2563eb; text-decoration: underline; }
+  .news-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .news-source { font-size: 11px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+  .news-date { font-size: 11px; color: #94a3b8; }
+  .news-summary { font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.5; }
+  .cat-tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .cat-brand { background: #dbeafe; color: #1d4ed8; }
+  .cat-partner { background: #fef3c7; color: #92400e; }
+  .cat-award { background: #faf5ff; color: #7c3aed; }
+  .cat-hr { background: #fff7ed; color: #c2410c; }
+  .cat-product { background: #f0fdf4; color: #15803d; }
+
+  /* Share of Voice */
+  .sov-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  .sov-table th { text-align: left; padding: 8px 12px; background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+  .sov-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .sov-table tr:hover { background: #f8fafc; }
+  .sentiment-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-pos { background: #dcfce7; color: #15803d; }
+  .badge-mix { background: #fef3c7; color: #92400e; }
+  .badge-neu { background: #f1f5f9; color: #475569; }
+
+  /* LinkedIn Keywords */
+  .linkedin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .li-item { background: #f8fafc; border-left: 3px solid #0a66c2; padding: 12px 14px; border-radius: 0 8px 8px 0; }
+  .li-item-num { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .li-hashtag { font-size: 14px; font-weight: 700; color: #0a66c2; text-decoration: none; }
+  .li-hashtag:hover { text-decoration: underline; }
+  .li-desc { font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.4; }
+  .li-source { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+  /* Opportunities & Risks */
+  .opp-risk { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .opp-box { background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; padding: 18px; }
+  .risk-box { background: #fff7ed; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 18px; }
+  .opp-box h3 { color: #15803d; font-size: 14px; margin-bottom: 12px; }
+  .risk-box h3 { color: #b45309; font-size: 14px; margin-bottom: 12px; }
+  .opp-box ul, .risk-box ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .opp-box li, .risk-box li { font-size: 13px; color: #374151; padding-left: 16px; position: relative; line-height: 1.5; }
+  .opp-box li::before { content: "✦"; position: absolute; left: 0; color: #22c55e; font-size: 10px; top: 3px; }
+  .risk-box li::before { content: "⚠"; position: absolute; left: 0; color: #f59e0b; font-size: 10px; top: 3px; }
+
+  /* Recommendations */
+  .rec-list { display: flex; flex-direction: column; gap: 12px; }
+  .rec-item { background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; gap: 14px; align-items: flex-start; }
+  .rec-num { width: 30px; height: 30px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .rec-title { font-size: 14px; font-weight: 600; color: #1e3a5f; margin-bottom: 4px; }
+  .rec-desc { font-size: 13px; color: #475569; line-height: 1.5; }
+
+  /* Data note */
+  .data-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #92400e; margin-bottom: 20px; }
+
+  @media (max-width: 768px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .row-2, .row-3, .row-2-equal { grid-template-columns: 1fr; }
+    .opp-risk { grid-template-columns: 1fr; }
+    .linkedin-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>📊 Social Listening Dashboard — SotaTek</h1>
+  <div class="meta">
+    <span>🏭 Ngành: IT Outsourcing / AI & Blockchain</span>
+    <span>📅 Kỳ quét: 01/01/2026 – 07/04/2026</span>
+    <span>🕐 Tạo: 07/04/2026</span>
+    <span>🔍 Nguồn: Web search đa kênh</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- DATA NOTE -->
+  <div class="data-note">
+    ⚠️ <strong>Lưu ý dữ liệu:</strong> Báo cáo này tổng hợp mentions có URL xác nhận từ web search. Buzz Movement được group theo tuần do dữ liệu theo ngày không đủ đặc tả. ITviec/VOZ access bị hạn chế — số liệu từ search snippet.
+  </div>
+
+  <!-- ROW 1: SUMMARY STATS -->
+  <div class="summary-grid">
+    <div class="card">
+      <div class="card-label">Tổng Buzz (Xác nhận)</div>
+      <div class="card-value">38</div>
+      <div class="card-sub">Mentions có URL dẫn chứng</div>
+    </div>
+    <div class="card card-neu">
+      <div class="card-label">SotaTek Buzz</div>
+      <div class="card-value">38</div>
+      <div class="card-sub">Brand chính · Tất cả kênh</div>
+    </div>
+    <div class="card card-pos">
+      <div class="card-label">Sentiment Tích cực</div>
+      <div class="card-value">65%</div>
+      <div class="card-sub">~25 mentions positive</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Kênh đã quét</div>
+      <div class="card-value">8</div>
+      <div class="card-sub">News · Social · Forum · Review</div>
+    </div>
+  </div>
+
+  <!-- ROW 2: BUZZ MOVEMENT + TOP NEWS SOURCES -->
+  <div class="row-2">
+    <div class="card">
+      <div class="section-title">📈 Buzz Movement — Theo tuần (Jan–Apr 2026)</div>
+      <div class="chart-wrap">
+        <canvas id="buzzChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">📰 Top Sources — News</div>
+      <div class="source-list">
+        <div class="source-row">
+          <div class="rank gold">1</div>
+          <span class="source-name">cafef.vn</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <span class="buzz-num">6 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank silver">2</div>
+          <span class="source-name">vnexpress.net</span>
+          <div class="bar-track"><div class="bar-fill" style="width:67%"></div></div>
+          <span class="buzz-num">4 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank bronze">3</div>
+          <span class="source-name">sotatek.com</span>
+          <div class="bar-track"><div class="bar-fill" style="width:50%"></div></div>
+          <span class="buzz-num">3 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">4</div>
+          <span class="source-name">vietnam.vn</span>
+          <div class="bar-track"><div class="bar-fill" style="width:33%"></div></div>
+          <span class="buzz-num">2 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">5</div>
+          <span class="source-name">dantri.com.vn</span>
+          <div class="bar-track"><div class="bar-fill" style="width:17%"></div></div>
+          <span class="buzz-num">1 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">6</div>
+          <span class="source-name">ictnews.vn</span>
+          <div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>
+          <span class="buzz-num" style="color:#94a3b8">0</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">7</div>
+          <span class="source-name">tuoitre.vn</span>
+          <div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>
+          <span class="buzz-num" style="color:#94a3b8">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: TOP SOCIAL + SENTIMENT OVERVIEW + SENTIMENT MOVEMENT -->
+  <div class="row-3">
+    <div class="card">
+      <div class="section-title">📱 Top Sources — Social</div>
+      <div class="source-list">
+        <div class="source-row">
+          <div class="rank gold">1</div>
+          <span class="source-name">linkedin.com</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:100%"></div></div>
+          <span class="buzz-num">7 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank silver">2</div>
+          <span class="source-name">itviec.com</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:71%"></div></div>
+          <span class="buzz-num">5 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank bronze">3</div>
+          <span class="source-name">facebook.com</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:57%"></div></div>
+          <span class="buzz-num">4 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">4</div>
+          <span class="source-name">1900.com.vn</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:43%"></div></div>
+          <span class="buzz-num">3 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">5</div>
+          <span class="source-name">glassdoor.com</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:29%"></div></div>
+          <span class="buzz-num">2 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">6</div>
+          <span class="source-name">voz.vn</span>
+          <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:14%"></div></div>
+          <span class="buzz-num">1 buzz</span>
+        </div>
+        <div class="source-row">
+          <div class="rank">—</div>
+          <span class="source-name">TikTok/YouTube</span>
+          <div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>
+          <span class="buzz-num" style="color:#94a3b8">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🎯 Sentiment Overview</div>
+      <div class="chart-wrap-sm">
+        <canvas id="sentimentDonut"></canvas>
+      </div>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:12px; font-size:12px;">
+        <span>🟢 Tích cực: <strong>65%</strong></span>
+        <span>⚪ Trung tính: <strong>25%</strong></span>
+        <span>🔴 Tiêu cực: <strong>10%</strong></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">📉 Sentiment Movement (Theo tuần)</div>
+      <div class="chart-wrap-sm">
+        <canvas id="sentimentMovement"></canvas>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:8px; text-align:center;">* Group theo tuần — không đủ data theo ngày</div>
+    </div>
+  </div>
+
+  <!-- ROW 4: BUZZ BY CHANNEL + KEYWORDS -->
+  <div class="row-2-equal">
+    <div class="card">
+      <div class="section-title">📊 Buzz by Channel</div>
+      <div class="chart-wrap">
+        <canvas id="channelDonut"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🔤 Top Mentioned Keywords</div>
+      <!-- TÍCH CỰC -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;color:#15803d;background:#dcfce7;display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;margin-bottom:8px;">🟢 TÍCH CỰC — trích từ 177 reviews 1900.com.vn + báo chí</div>
+        <div class="tags">
+          <a class="tag tag-pos tag-xl" href="https://cafef.vn/sotatek-va-he-sinh-thai-cong-nghe-da-nganh-tien-phong-trong-ky-nguyen-chuyen-doi-so-quoc-gia-188250519111527319.chn" target="_blank" title="Xuất hiện rộng rãi trên báo & 1900.com.vn">AI & Blockchain</a>
+          <a class="tag tag-pos tag-xl" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="187 reviews — nguồn 1900.com.vn">"Lương thưởng tốt, trả OT đúng quy định"</a>
+          <a class="tag tag-pos tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="143 reviews — 1900.com.vn">"Đồng nghiệp hòa đồng, thân thiện"</a>
+          <a class="tag tag-pos tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="135 reviews — 1900.com.vn">"Lộ trình thăng tiến rõ ràng"</a>
+          <a class="tag tag-pos tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="129 reviews — 1900.com.vn">"Cơ sở vật chất đẹp, pantry, quầy bar"</a>
+          <a class="tag tag-pos" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="152 reviews — 1900.com.vn">"Nhiều câu lạc bộ, hỗ trợ sinh hoạt"</a>
+          <a class="tag tag-pos" href="https://baodautu.vn/sotatek-duoc-vinh-danh-noi-lam-viec-tot-nhat-chau-a-2025-d388687.html" target="_blank" title="HR Asia Award — baodautu.vn">"Nơi làm việc tốt nhất châu Á 2025"</a>
+          <a class="tag tag-pos" href="https://cafef.vn/ceo-sotatek-luu-chung-tuyen-thoat-khoi-cai-bong-gia-cong-de-phat-trien-cong-nghe-loi-cho-viet-nam-188251211164100287.chn" target="_blank" title="cafef.vn — CEO Interview 12/2025">"Happy employees, happy clients"</a>
+          <a class="tag tag-pos" href="https://cafef.vn/tang-toc-kinh-doanh-sotatek-tiep-tuc-mo-van-phong-moi-tai-han-quoc-20230112161210784.chn" target="_blank">Mở rộng quốc tế (JP, KR, US, AU)</a>
+          <a class="tag tag-pos" href="https://www.glassdoor.com/Reviews/SotaTek-JSC-Reviews-E4836540.htm" target="_blank" title="Glassdoor — 4.4/5 sao, 94% recommend">4.4/5 ⭐ Glassdoor · 94% recommend</a>
+        </div>
+      </div>
+      <!-- TIÊU CỰC -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;color:#991b1b;background:#fee2e2;display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;margin-bottom:8px;">🔴 TIÊU CỰC — trích từ 1900.com.vn, ITviec, VOZ</div>
+        <div class="tags">
+          <a class="tag tag-neg tag-xl" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="183 reviews — vấn đề phổ biến nhất">"Một người đảm nhận nhiều đầu việc"</a>
+          <a class="tag tag-neg tag-xl" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="183 reviews — 1900.com.vn">"Nhiều dự án chưa có quy trình rõ ràng"</a>
+          <a class="tag tag-neg tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="176 reviews — 1900.com.vn">"Quy trình tuyển dụng lộn xộn, không phản hồi"</a>
+          <a class="tag tag-neg tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="152 reviews — 1900.com.vn">"Giờ làm việc chưa linh hoạt, nhiều quy định"</a>
+          <a class="tag tag-neg tag-lg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="152 reviews — OT strict">"OT logging system khắt khe"</a>
+          <a class="tag tag-neg" href="https://itviec.com/companies/sota-tek/review" target="_blank" title="ITviec reviews">"1 năm review lương 1 lần"</a>
+          <a class="tag tag-neg" href="https://1900.com.vn/danh-gia-dn/sotatek-712" target="_blank" title="142 reviews — 1900.com.vn">"Văn phòng rải rác nhiều tầng, nhiều tòa"</a>
+          <a class="tag tag-neg" href="https://itviec.com/companies/sota-tek/review" target="_blank" title="ITviec + VOZ pattern">"Senior rời đi, fresher tràn vào"</a>
+          <a class="tag tag-neg" href="https://itviec.com/companies/sota-tek/review" target="_blank" title="Pattern phổ biến ITviec">"Outsourcing Korea-centric, văn hóa toxic"</a>
+          <a class="tag tag-neg" href="https://itviec.com/companies/sota-tek/review" target="_blank" title="ITviec">"Chất lượng sản phẩm nội bộ chưa cao"</a>
+        </div>
+      </div>
+      <!-- TRENDING -->
+      <div>
+        <div style="font-size:11px;color:#1d4ed8;background:#dbeafe;display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;margin-bottom:8px;">🔵 TRENDING NGÀNH — IT Vietnam 2026</div>
+        <div class="tags">
+          <a class="tag tag-trend tag-xl" href="https://cafef.vn/viettel-fpt-cmc-vnpt-sovico-nhan-nhiem-vu-quoc-gia-188251231135931399.chn" target="_blank">Chip bán dẫn Việt Nam</a>
+          <a class="tag tag-trend tag-xl" href="https://www.vietnam.vn/en/sotatek-ptit-va-ai-for-vietnam-ky-ket-hop-tac-trien-khai-deepedu-dua-ai-vao-doi-moi-giao-duc" target="_blank">ViGen · AI tiếng Việt</a>
+          <a class="tag tag-trend tag-lg" href="https://www.vietnam.vn/en/sotatek-ptit-va-ai-for-vietnam-ky-ket-hop-tac-trien-khai-deepedu-dua-ai-vao-doi-moi-giao-duc" target="_blank">EdTech AI (DeepEdu)</a>
+          <a class="tag tag-trend tag-lg" href="https://cafef.vn/viettel-fpt-cmc-vnpt-sovico-nhan-nhiem-vu-quoc-gia-188251231135931399.chn" target="_blank">Make in Vietnam</a>
+          <a class="tag tag-trend" href="https://baodautu.vn/sotatek-duoc-vinh-danh-noi-lam-viec-tot-nhat-chau-a-2025-d388687.html" target="_blank">Healthcare IT · LIS-AI</a>
+          <a class="tag tag-trend" href="https://www.glassdoor.com/Reviews/SotaTek-JSC-Reviews-E4836540.htm" target="_blank">SOC 2 Type II Security</a>
+          <a class="tag tag-trend" href="https://cafef.vn/sotatek-va-ekotek-hop-tac-thuc-day-ung-dung-blockchain-ai-cho-doanh-nghiep-viet-188251104180906421.chn" target="_blank">Blockchain cho nông nghiệp</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 5: SHARE OF VOICE -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="section-title">🏆 Share of Voice — IT Outsourcing Vietnam (Ước tính theo web presence)</div>
+    <div class="chart-wrap" style="height:200px;">
+      <canvas id="sovChart"></canvas>
+    </div>
+    <table class="sov-table">
+      <thead>
+        <tr>
+          <th>Thương hiệu</th>
+          <th>Buzz ước tính</th>
+          <th>Sentiment</th>
+          <th>Quy mô</th>
+          <th>Thị trường</th>
+          <th>Hoạt động nổi bật</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>SotaTek</strong></td>
+          <td>38</td>
+          <td><span class="sentiment-badge badge-pos">Tích cực 65%</span></td>
+          <td>1.300+ nhân sự</td>
+          <td>25+ quốc gia</td>
+          <td>SotaSoC tapeout, AI Healthcare, SOC 2 Type II</td>
+        </tr>
+        <tr>
+          <td>FPT Software</td>
+          <td>150+</td>
+          <td><span class="sentiment-badge badge-pos">Tích cực</span></td>
+          <td>30.000+ nhân sự</td>
+          <td>Toàn cầu</td>
+          <td>Fortune 500 clients, AI & Cloud transformation</td>
+        </tr>
+        <tr>
+          <td>KMS Technology</td>
+          <td>40+</td>
+          <td><span class="sentiment-badge badge-pos">Tích cực</span></td>
+          <td>2.000+ nhân sự</td>
+          <td>Mỹ, châu Âu</td>
+          <td>QA automation, Cloud computing</td>
+        </tr>
+        <tr>
+          <td>NashTech</td>
+          <td>30+</td>
+          <td><span class="sentiment-badge badge-neu">Trung tính</span></td>
+          <td>3.000+ nhân sự</td>
+          <td>UK, châu Âu</td>
+          <td>Digital transformation, IT consulting</td>
+        </tr>
+        <tr>
+          <td>Axon Active</td>
+          <td>15+</td>
+          <td><span class="sentiment-badge badge-pos">Tích cực</span></td>
+          <td>600+ nhân sự</td>
+          <td>Thụy Sĩ, châu Âu</td>
+          <td>Agile methodology, offshore dev</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:11px;color:#94a3b8;margin-top:8px;">* Buzz của đối thủ là ước tính theo web presence chung — chưa thực hiện full search riêng từng đối thủ trong kỳ này</p>
+  </div>
+
+  <!-- ROW 6: KEYWORDS DETAIL (3 columns) - already shown above in word cloud section -->
+
+  <!-- ROW 6B: SOTATEK CAREERS HR SOCIAL -->
+  <div class="card" style="margin-bottom:24px; border-left:4px solid #1877f2;">
+    <div class="section-title">📣 SotaTek Careers HR Social — Facebook Page Hot Content</div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:14px;">Kênh <strong>facebook.com/SotaTekCareers</strong> (15.000+ followers) — active hàng tuần với nội dung tuyển dụng, meme IT, văn hóa nội bộ. <strong>TikTok: Không tìm thấy kênh chính thức của SotaTek.</strong></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+
+      <div style="background:#f0f7ff;border-radius:10px;padding:14px;border-top:3px solid #1877f2;">
+        <div style="font-size:10px;color:#1d4ed8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">🔥 CHIẾN DỊCH HOT NHẤT</div>
+        <a href="https://www.facebook.com/SotaTekCareers/photos/it-talent-hunt-2026-%C4%91%E1%BB%A3t-tuy%E1%BB%83n-d%E1%BB%A5ng-l%E1%BB%9Bn-nh%E1%BA%A5t-t%E1%BB%AB-tr%C6%B0%E1%BB%9Bc-t%E1%BB%9Bi-naysotatek-ch%C3%ADnh-th%E1%BB%A9c-k/1393569766121370/" target="_blank" style="font-size:13px;font-weight:700;color:#1e3a5f;text-decoration:none;display:block;margin-bottom:6px;">🚨 IT TALENT HUNT 2026</a>
+        <div style="font-size:12px;color:#475569;line-height:1.5;">"Đợt tuyển dụng lớn nhất từ trước tới nay" — chiến dịch mass hiring đầu 2026, tuyển nhiều vị trí kỹ thuật, tone hype mạnh. Hashtag: #ITTalentHunt2026 #SotaTek</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;">facebook.com/SotaTekCareers · Q1/2026</div>
+      </div>
+
+      <div style="background:#f0f7ff;border-radius:10px;padding:14px;border-top:3px solid #1877f2;">
+        <div style="font-size:10px;color:#1d4ed8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">😂 MEME / J4F CONTENT</div>
+        <a href="https://www.facebook.com/SotaTekCareers/posts/meme-dear-2026-%C4%91%E1%BB%ABng-%C4%91%E1%BB%91i-x%E1%BB%AD-v%E1%BB%9Bi-t%C3%B4i-nh%C6%B0-c%C3%A1ch-2025-%C4%91%C3%A3-t%E1%BB%ABngthankssotatek-sotatekcar/1327139502764397/" target="_blank" style="font-size:13px;font-weight:700;color:#1e3a5f;text-decoration:none;display:block;margin-bottom:6px;">[Meme] Dear 2026, đừng đối xử với tôi như 2025 🥲</a>
+        <div style="font-size:12px;color:#475569;line-height:1.5;">Series meme IT được Gen Z developer tương tác cao — tone hài hước, gần gũi, dùng hashtag #J4F (Just for Fun). Giúp tăng reach tự nhiên mạnh.</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;">facebook.com/SotaTekCareers · 26/12/2025</div>
+      </div>
+
+      <div style="background:#f0f7ff;border-radius:10px;padding:14px;border-top:3px solid #1877f2;">
+        <div style="font-size:10px;color:#1d4ed8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">📊 YEAR-END CONTENT</div>
+        <a href="https://www.facebook.com/SotaTekCareers/posts/theo-d%C3%B2ng-s%E1%BB%B1-ki%E1%BB%87n-ch%C3%BAng-t%C3%B4i-c%C5%A9ng-l%C3%A0m-ch%C3%BAt-wrapped-up-g%E1%BB%8Di-l%C3%A0-t%E1%BB%95ng-k%E1%BA%BFt-cho-n%C4%83m-202/1321086890036325/" target="_blank" style="font-size:13px;font-weight:700;color:#1e3a5f;text-decoration:none;display:block;margin-bottom:6px;">SotaTek Wrapped Up 2025 🫣</a>
+        <div style="font-size:12px;color:#475569;line-height:1.5;">Tổng kết năm 2025 theo format Spotify Wrapped — các sự kiện nổi bật, cột mốc nhân sự, dự án lớn. Hashtag: #SotaTek #SotaTekCareers #IT #J4F</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;">facebook.com/SotaTekCareers · 19/12/2025</div>
+      </div>
+
+      <div style="background:#f0f7ff;border-radius:10px;padding:14px;border-top:3px solid #1877f2;">
+        <div style="font-size:10px;color:#1d4ed8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">💻 CULTURE SNAPSHOT</div>
+        <a href="https://www.facebook.com/SotaTekCareers/posts/c%E1%BA%ADp-nh%E1%BA%ADt-t%C3%ACnh-h%C3%ACnh-m%C3%A0n-h%C3%ACnh-m%C3%A1y-t%C3%ADnh-c%E1%BB%A7a-c%C3%A1c-sotateker-v%C3%A0o-ng%C3%A0y-cu%E1%BB%91i-c%C3%B9ng-c%E1%BB%A7a-n%C4%83m-2/1330645642413783/" target="_blank" style="font-size:13px;font-weight:700;color:#1e3a5f;text-decoration:none;display:block;margin-bottom:6px;">Màn hình máy tính SotaTeker ngày cuối năm 😂</a>
+        <div style="font-size:12px;color:#475569;line-height:1.5;">UGC-style post chia sẻ màn hình làm việc ngày 31/12 — authentic, relatable, nhận tương tác tự nhiên cao từ cộng đồng IT. Hashtag: #ITJobs #Tuyendung #J4F</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;">facebook.com/SotaTekCareers · 31/12/2025</div>
+      </div>
+
+    </div>
+    <div style="margin-top:14px;padding:10px 14px;background:#fffbeb;border-radius:8px;font-size:12px;color:#92400e;">
+      ⚠️ <strong>TikTok:</strong> Không tìm thấy kênh TikTok chính thức của SotaTek qua web search. @sototek2024 là kênh review điện thoại không liên quan. Đây là khoảng trống employer branding đáng chú ý.
+    </div>
+  </div>
+
+  <!-- ROW 7: TOP 10 NEWS — Chỉ nguồn báo chí độc lập, LOẠI TRỪ website thương hiệu -->
+  <div style="margin-bottom:24px;">
+    <div class="section-title" style="border-bottom:2px solid #e2e8f0; padding-bottom:10px; margin-bottom:16px; font-size:15px; font-weight:600; color:#1e3a5f;">📋 Top 10 Tin tức Hot — Báo chí độc lập (Loại trừ owned media)</div>
+    <div style="font-size:12px;color:#64748b;background:#f8fafc;padding:8px 12px;border-radius:6px;margin-bottom:14px;">ℹ️ Chỉ liệt kê bài từ báo chí bên thứ ba (earned media) — không bao gồm sotatek.com và các website chính thức của thương hiệu.</div>
+    <div class="news-list">
+
+      <div class="news-item">
+        <div class="news-rank top3">1</div>
+        <div class="news-content">
+          <a class="news-title" href="https://cafef.vn/ceo-sotatek-luu-chung-tuyen-thoat-khoi-cai-bong-gia-cong-de-phat-trien-cong-nghe-loi-cho-viet-nam-188251211164100287.chn" target="_blank">CEO SotaTek Lưu Chung Tuyến: Thoát khỏi cái bóng gia công để phát triển công nghệ lõi cho Việt Nam</a>
+          <div class="news-meta">
+            <span class="news-source">cafef.vn</span>
+            <span class="cat-tag cat-brand">CEO Interview</span>
+            <span class="news-date">11/12/2025</span>
+          </div>
+          <div class="news-summary">CEO chia sẻ chiến lược "Future is AI" với hệ sinh thái sản phẩm Made by Sota, tăng trưởng 20%/năm và mở rộng tới 400.000 người dùng toàn cầu.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank top3">2</div>
+        <div class="news-content">
+          <a class="news-title" href="https://baodautu.vn/sotatek-duoc-vinh-danh-noi-lam-viec-tot-nhat-chau-a-2025-d388687.html" target="_blank">SotaTek được vinh danh "Nơi làm việc tốt nhất châu Á 2025" bởi HR Asia</a>
+          <div class="news-meta">
+            <span class="news-source">baodautu.vn</span>
+            <span class="cat-tag cat-award">Giải thưởng</span>
+            <span class="news-date">19/09/2025</span>
+          </div>
+          <div class="news-summary">HR Asia vinh danh SotaTek với triết lý "Happy employees, happy clients" — cột mốc 10 năm, 1.300+ nhân sự, văn phòng 6 quốc gia.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank top3">3</div>
+        <div class="news-content">
+          <a class="news-title" href="https://cafef.vn/viettel-fpt-cmc-vnpt-sovico-nhan-nhiem-vu-quoc-gia-188251231135931399.chn" target="_blank">Viettel, FPT, CMC, VNPT, Sovico — và SotaTek — nhận nhiệm vụ quốc gia về công nghệ</a>
+          <div class="news-meta">
+            <span class="news-source">cafef.vn</span>
+            <span class="cat-tag cat-brand">Chiến lược quốc gia</span>
+            <span class="news-date">31/12/2025</span>
+          </div>
+          <div class="news-summary">SotaTek cam kết triển khai blockchain truy xuất nguồn gốc cho 50 doanh nghiệp, 500 hợp tác xã, phục vụ 50.000 tấn nông sản tại Diễn đàn Quốc gia.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">4</div>
+        <div class="news-content">
+          <a class="news-title" href="https://cafef.vn/sotatek-va-ekotek-hop-tac-thuc-day-ung-dung-blockchain-ai-cho-doanh-nghiep-viet-188251104180906421.chn" target="_blank">SotaTek và Ekotek hợp tác thúc đẩy ứng dụng Blockchain & AI cho doanh nghiệp Việt</a>
+          <div class="news-meta">
+            <span class="news-source">cafef.vn</span>
+            <span class="cat-tag cat-partner">Hợp tác</span>
+            <span class="news-date">04/11/2025</span>
+          </div>
+          <div class="news-summary">Hợp tác chiến lược nhằm đẩy mạnh ứng dụng công nghệ Blockchain và AI trong chuyển đổi số doanh nghiệp Việt Nam.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">5</div>
+        <div class="news-content">
+          <a class="news-title" href="https://www.vietnam.vn/en/sotatek-ptit-va-ai-for-vietnam-ky-ket-hop-tac-trien-khai-deepedu-dua-ai-vao-doi-moi-giao-duc" target="_blank">SotaTek, PTIT và AI for Vietnam ký kết hợp tác triển khai DeepEdu — đưa AI vào đổi mới giáo dục</a>
+          <div class="news-meta">
+            <span class="news-source">vietnam.vn</span>
+            <span class="cat-tag cat-partner">Hợp tác EdTech</span>
+            <span class="news-date">26/09/2025</span>
+          </div>
+          <div class="news-summary">DeepEdu phát triển mô hình AI tiếng Việt cho giáo dục, tăng cường khả năng tiếp cận học tập bình đẳng và nâng cao năng lực cạnh tranh nhân lực.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">6</div>
+        <div class="news-content">
+          <a class="news-title" href="https://cafef.vn/sotatek-va-he-sinh-thai-cong-nghe-da-nganh-tien-phong-trong-ky-nguyen-chuyen-doi-so-quoc-gia-188250519111527319.chn" target="_blank">SotaTek và hệ sinh thái công nghệ đa ngành tiên phong trong kỷ nguyên chuyển đổi số quốc gia</a>
+          <div class="news-meta">
+            <span class="news-source">cafef.vn</span>
+            <span class="cat-tag cat-brand">Hệ sinh thái</span>
+            <span class="news-date">19/05/2025</span>
+          </div>
+          <div class="news-summary">Sota Holdings với 11 công ty thành viên, BASAO AI định giá BĐS rút ngắn 90% thời gian, NoteX chính xác 99.2%, RaidenX DEX nhanh hơn 10 giây.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">7</div>
+        <div class="news-content">
+          <a class="news-title" href="https://cafef.vn/sotatek-hop-tac-metanet-global-buoc-tien-moi-trong-chuyen-doi-so-doanh-nghiep-188241010155131754.chn" target="_blank">SotaTek hợp tác Metanet Global: Bước tiến mới trong chuyển đổi số doanh nghiệp</a>
+          <div class="news-meta">
+            <span class="news-source">cafef.vn</span>
+            <span class="cat-tag cat-partner">Hợp tác QT</span>
+            <span class="news-date">10/10/2024</span>
+          </div>
+          <div class="news-summary">CEO Lưu Chung Tuyến: hợp tác Metanet Global là phần quan trọng trong chiến lược dài hạn củng cố vị thế quốc tế và cung cấp giải pháp công nghệ tiên tiến.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">8</div>
+        <div class="news-content">
+          <a class="news-title" href="https://dantri.com.vn/cong-nghe/sotatek-xoa-bo-rao-can-tu-duy-ve-blockchain-bang-nhung-ung-dung-thuc-tien-20220819145207380.htm" target="_blank">SotaTek xóa bỏ rào cản tư duy về Blockchain bằng những ứng dụng thực tiễn</a>
+          <div class="news-meta">
+            <span class="news-source">dantri.com.vn</span>
+            <span class="cat-tag cat-product">Blockchain</span>
+            <span class="news-date">19/08/2022</span>
+          </div>
+          <div class="news-summary">SotaTek định vị là công ty có đội ngũ blockchain lớn nhất Đông Nam Á, đưa công nghệ này vào ứng dụng thực tiễn cho doanh nghiệp Việt Nam.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">9</div>
+        <div class="news-content">
+          <a class="news-title" href="https://vnexpress.net/tu-cau-be-me-game-den-nha-sang-lap-startup-blockchain-4485497.html" target="_blank">Từ cậu bé mê game đến nhà sáng lập startup blockchain — Hành trình CEO Lưu Chung Tuyến</a>
+          <div class="news-meta">
+            <span class="news-source">vnexpress.net</span>
+            <span class="cat-tag cat-brand">Founder Story</span>
+            <span class="news-date">2022</span>
+          </div>
+          <div class="news-summary">Profile CEO SotaTek trên VnExpress — câu chuyện khởi nghiệp từ đam mê game đến xây dựng công ty blockchain hàng đầu Việt Nam.</div>
+        </div>
+      </div>
+
+      <div class="news-item">
+        <div class="news-rank">10</div>
+        <div class="news-content">
+          <a class="news-title" href="https://vnexpress.net/10-lanh-dao-cong-nghe-tre-xuat-sac-2022-4477138.html" target="_blank">10 lãnh đạo công nghệ trẻ xuất sắc 2022 — CEO SotaTek trong danh sách</a>
+          <div class="news-meta">
+            <span class="news-source">vnexpress.net</span>
+            <span class="cat-tag cat-award">Vinh danh</span>
+            <span class="news-date">2022</span>
+          </div>
+          <div class="news-summary">Lưu Chung Tuyến được VnExpress vinh danh trong top 10 lãnh đạo công nghệ trẻ xuất sắc — công nhận sớm trước giai đoạn tăng tốc mạnh 2023-2026.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ROW 8: LINKEDIN KEYWORDS -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="section-title">💼 Top 10 LinkedIn Keywords — IT/AI Vietnam</div>
+    <div class="linkedin-grid">
+      <div class="li-item">
+        <div class="li-item-num">#01</div>
+        <a class="li-hashtag" href="https://www.linkedin.com/company/sota-tek" target="_blank">#AIInnovation</a>
+        <div class="li-desc">Xu hướng AI ứng dụng vào sản phẩm thực tế — SotaTek dùng rộng rãi trong các bài đăng về NoteX, SotaAgents, SotaVision.</div>
+        <div class="li-source">Nguồn: linkedin.com/company/sota-tek</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#02</div>
+        <a class="li-hashtag" href="https://www.linkedin.com/posts/sota-tek_sotatek-ptit-deepedu-activity-7377279334220406785-ZoKj" target="_blank">#Blockchain</a>
+        <div class="li-desc">Công nghệ blockchain cho truy xuất nguồn gốc nông sản, tài chính, giáo dục — core competency của SotaTek.</div>
+        <div class="li-source">Nguồn: linkedin.com posts SotaTek</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#03</div>
+        <a class="li-hashtag" href="https://www.linkedin.com/company/sota-tek" target="_blank">#DigitalTransformation</a>
+        <div class="li-desc">Chuyển đổi số doanh nghiệp — chủ đề trung tâm trong chiến lược nội dung LinkedIn của SotaTek.</div>
+        <div class="li-source">Nguồn: linkedin.com/company/sota-tek</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#04</div>
+        <a class="li-hashtag" href="https://www.sotatek.com/newsroom/sotasoc-reaches-tapeout-after-completing-the-full-design-phase/" target="_blank">#Semiconductor</a>
+        <div class="li-desc">Sóng mới sau SotaSoC tapeout — ngành bán dẫn Việt Nam đang trở thành chủ đề hot trên LinkedIn tech community.</div>
+        <div class="li-source">Nguồn: sotatek.com/newsroom</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#05</div>
+        <a class="li-hashtag" href="https://www.vietnam.vn/en/sotatek-ptit-va-ai-for-vietnam-ky-ket-hop-tac-trien-khai-deepedu-dua-ai-vao-doi-moi-giao-duc" target="_blank">#EdTech</a>
+        <div class="li-desc">DeepEdu + AI for Vietnam — giáo dục AI tiếng Việt đang tạo sóng trong cộng đồng LinkedIn Việt Nam.</div>
+        <div class="li-source">Nguồn: vietnam.vn DeepEdu announcement</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#06</div>
+        <a class="li-hashtag" href="https://www.sotatek.com/newsroom/" target="_blank">#HealthcareIT</a>
+        <div class="li-desc">Triển khai LIS-AI tại bệnh viện — IT y tế là vertical đang tăng trưởng mạnh và được đề cập nhiều trên LinkedIn B2B.</div>
+        <div class="li-source">Nguồn: sotatek.com newsroom</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#07</div>
+        <a class="li-hashtag" href="https://cafef.vn/viettel-fpt-cmc-vnpt-sovico-nhan-nhiem-vu-quoc-gia-188251231135931399.chn" target="_blank">#MakeInVietnam</a>
+        <div class="li-desc">Phong trào "Make in Vietnam" — SotaTek là một trong các công ty cam kết phát triển công nghệ lõi tại Diễn đàn Quốc gia 2025.</div>
+        <div class="li-source">Nguồn: cafef.vn</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#08</div>
+        <a class="li-hashtag" href="https://www.linkedin.com/posts/sota-tek_recap-sotatek-korea-yep-2025-wrap-up-activity-7427201735695224832-jKz4" target="_blank">#SotaTek</a>
+        <div class="li-desc">Brand hashtag chính — active trên LinkedIn với recap events, partnerships, product announcements, và CEO insights.</div>
+        <div class="li-source">Nguồn: linkedin.com/posts/sota-tek</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#09</div>
+        <a class="li-hashtag" href="https://www.sotatek.com/newsroom/sotatek-contributes-to-vigen-vietnams-first-open-source-vietnamese-language-dataset-for-ai/" target="_blank">#OpenSourceAI</a>
+        <div class="li-desc">ViGen dataset mã nguồn mở tiếng Việt — xu hướng AI dữ liệu mở đang được cộng đồng LinkedIn Việt Nam quan tâm.</div>
+        <div class="li-source">Nguồn: sotatek.com/newsroom ViGen</div>
+      </div>
+      <div class="li-item">
+        <div class="li-item-num">#10</div>
+        <a class="li-hashtag" href="https://cafef.vn/sotatek-va-he-sinh-thai-cong-nghe-da-nganh-tien-phong-trong-ky-nguyen-chuyen-doi-so-quoc-gia-188250519111527319.chn" target="_blank">#TechEcosystem</a>
+        <div class="li-desc">Hệ sinh thái công nghệ đa ngành — Sota Holdings với 11 công ty thành viên đang xây dựng narrative về "tech ecosystem" trên LinkedIn.</div>
+        <div class="li-source">Nguồn: cafef.vn</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 9: OPPORTUNITIES & RISKS -->
+  <div class="opp-risk">
+    <div class="opp-box">
+      <h3>✅ Cơ hội thị trường</h3>
+      <ul>
+        <li><strong>Bán dẫn & chip nội địa:</strong> SotaSoC tapeout tháng 2/2026 mở ra câu chuyện brand mới — "Vietnam làm chip" tạo sóng truyền thông lớn dự kiến vào Q3/2026 khi chip ra lò.</li>
+        <li><strong>Healthcare IT đang bùng nổ:</strong> Triển khai LIS-AI tại bệnh viện là vertical tăng trưởng cao, nhà nước đang thúc đẩy số hóa bệnh viện toàn quốc.</li>
+        <li><strong>AI quốc gia (Make in Vietnam):</strong> SotaTek là một trong số ít công ty được ghi nhận trong chương trình quốc gia — lợi thế PR và đấu thầu nhà nước.</li>
+        <li><strong>Thị trường Nhật Bản mới:</strong> Văn phòng Fukuoka khai trương 2026 — tiếp cận thị trường Kyushu, thường ít cạnh tranh hơn Tokyo cho outsourcing Việt.</li>
+        <li><strong>ViGen & DeepEdu:</strong> Tham gia vào hạ tầng AI quốc gia tạo vị thế thought leadership và pipeline tuyển dụng kỹ sư AI trẻ.</li>
+      </ul>
+    </div>
+    <div class="risk-box">
+      <h3>⚠️ Rủi ro & điểm cần chú ý</h3>
+      <ul>
+        <li><strong>Hình ảnh "công ty outsourcing":</strong> Dù đang chuyển hướng, nhiều review nhân viên vẫn nhắc đến văn hóa outsourcing Korea-centric. Cần chủ động counter-narrative.</li>
+        <li><strong>Biến động nhân sự cao:</strong> Phản ánh trên ITviec/1900.com.vn về turnover rate — ảnh hưởng đến trust của khách hàng doanh nghiệp khi đánh giá vendor.</li>
+        <li><strong>Vắng mặt trên TikTok/YouTube:</strong> Không tìm thấy mentions trên 2 kênh này — bỏ lỡ cơ hội talent branding với Gen Z developer.</li>
+        <li><strong>Cạnh tranh từ FPT Software:</strong> FPT có buzz gấp 4 lần và nhân lực gấp 23 lần — khoảng cách brand awareness rất lớn trên báo chí dòng chính.</li>
+        <li><strong>Chất lượng sản phẩm nội bộ:</strong> Một số review đề cập product quality giảm do biến động nhân sự — cần theo dõi nếu lan ra public forum.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ROW 10: RECOMMENDATIONS -->
+  <div class="card" style="margin-bottom:32px;">
+    <div class="section-title">💡 Khuyến nghị Chiến lược</div>
+    <div class="rec-list">
+      <div class="rec-item">
+        <div class="rec-num">1</div>
+        <div>
+          <div class="rec-title">Tận dụng cột mốc SotaSoC chip Q3/2026 làm chiến dịch truyền thông lớn</div>
+          <div class="rec-desc">Khi chip SotaSoC ra lò dự kiến tháng 9/2026 — đây là cơ hội PR hiếm có. Cần chuẩn bị từ bây giờ: media kit, story angle "startup Việt làm chip", proactive outreach tới báo công nghệ lớn (VnExpress, ICTNews, CafeF, Dantri) và international tech press.</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <div class="rec-num">2</div>
+        <div>
+          <div class="rec-title">Xây dựng employer brand trên TikTok/YouTube để thu hút Gen Z developer</div>
+          <div class="rec-desc">Hiện tại zero presence trên TikTok và YouTube — trong khi đây là 2 kênh chính Gen Z dev xem review công ty. Nên triển khai content series "A day at SotaTek", culture showcase, và tech behind-the-scenes để counter-narrative tiêu cực về outsourcing culture.</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <div class="rec-num">3</div>
+        <div>
+          <div class="rec-title">Chủ động quản lý review trên ITviec và 1900.com.vn</div>
+          <div class="rec-desc">Với 140+ reviews trên 1900.com.vn và 37 reviews trên ITviec, cần có strategy respond chuyên nghiệp với các feedback tiêu cực về biến động nhân sự, đồng thời khuyến khích nhân viên hài lòng viết review mới để cân bằng sentiment.</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <div class="rec-num">4</div>
+        <div>
+          <div class="rec-title">Tăng hiện diện trên VnExpress và Tuoitre để mở rộng brand awareness đại chúng</div>
+          <div class="rec-desc">CafeF (6 bài) đang là kênh báo chí mạnh nhất, nhưng VnExpress (4 bài) và đặc biệt Tuoitre (0 bài) cần được khai thác. VnExpress Tech section và Tuoitre Start.vn có tệp độc giả trẻ phù hợp với câu chuyện AI/chip của SotaTek.</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <div class="rec-num">5</div>
+        <div>
+          <div class="rec-title">Đẩy mạnh LinkedIn B2B content về Healthcare IT và bán dẫn</div>
+          <div class="rec-desc">LIS-AI deployment và SotaSoC là 2 câu chuyện unique differentiator trên thị trường IT outsourcing Vietnam. Nên tạo thought leadership content series trên LinkedIn nhắm đến CHRO/CTO của bệnh viện và tập đoàn sản xuất điện tử khu vực APAC.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ========== Buzz Movement Chart ==========
+const buzzCtx = document.getElementById('buzzChart').getContext('2d');
+new Chart(buzzCtx, {
+  type: 'line',
+  data: {
+    labels: ['T1/W1','T1/W2','T1/W3','T1/W4','T2/W1','T2/W2','T2/W3','T2/W4','T3/W1','T3/W2','T3/W3','T3/W4','T4/W1'],
+    datasets: [{
+      label: 'SotaTek Buzz (2026)',
+      data: [3, 2, 1, 3, 2, 1, 2, 4, 6, 3, 3, 2, 2],
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37,99,235,0.08)',
+      borderWidth: 2.5,
+      pointBackgroundColor: '#2563eb',
+      pointRadius: 4,
+      tension: 0.3,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} mentions` } }
+    },
+    scales: {
+      x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+    }
+  }
+});
+
+// ========== Sentiment Donut ==========
+const sentCtx = document.getElementById('sentimentDonut').getContext('2d');
+new Chart(sentCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Tích cực', 'Trung tính', 'Tiêu cực'],
+    datasets: [{
+      data: [65, 25, 10],
+      backgroundColor: ['#22c55e', '#94a3b8', '#ef4444'],
+      borderWidth: 2,
+      borderColor: '#ffffff'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } }
+    }
+  }
+});
+
+// ========== Sentiment Movement ==========
+const smCtx = document.getElementById('sentimentMovement').getContext('2d');
+new Chart(smCtx, {
+  type: 'line',
+  data: {
+    labels: ['W1','W2','W3','W4','W5','W6','W7'],
+    datasets: [
+      { label: 'Positive', data: [2,1,1,2,1,4,3], borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.1)', borderWidth:2, tension:0.3, pointRadius:3 },
+      { label: 'Neutral',  data: [1,1,0,1,1,2,1], borderColor:'#94a3b8', backgroundColor:'rgba(148,163,184,0.1)', borderWidth:2, tension:0.3, pointRadius:3 },
+      { label: 'Negative', data: [0,0,0,0,0,0,1], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.1)', borderWidth:2, tension:0.3, pointRadius:3 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } }
+    },
+    scales: {
+      x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } } }
+    }
+  }
+});
+
+// ========== Channel Donut ==========
+const chCtx = document.getElementById('channelDonut').getContext('2d');
+new Chart(chCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['News/Báo', 'LinkedIn', 'Facebook', 'Review/Forum', 'Glassdoor/Clutch', 'TikTok', 'YouTube'],
+    datasets: [{
+      data: [10, 7, 4, 9, 8, 0, 0],
+      backgroundColor: ['#10b981','#0a66c2','#1877f2','#f59e0b','#8b5cf6','#94a3b8','#94a3b8'],
+      borderWidth: 2,
+      borderColor: '#ffffff'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '55%',
+    plugins: {
+      legend: {
+        display: true,
+        position: 'right',
+        labels: { font: { size: 10 }, boxWidth: 12, padding: 8 }
+      },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} mentions` } }
+    }
+  }
+});
+
+// ========== Share of Voice Bar ==========
+const sovCtx = document.getElementById('sovChart').getContext('2d');
+new Chart(sovCtx, {
+  type: 'bar',
+  data: {
+    labels: ['FPT Software', 'KMS Technology', 'SotaTek', 'NashTech', 'Axon Active'],
+    datasets: [{
+      label: 'Buzz ước tính',
+      data: [150, 40, 38, 30, 15],
+      backgroundColor: ['#e2e8f0','#e2e8f0','#2563eb','#e2e8f0','#e2e8f0'],
+      borderRadius: 6,
+      borderWidth: 0
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x} buzz` } }
+    },
+    scales: {
+      x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
+      y: { ticks: { font: { size: 11 } }, grid: { display: false } }
+    }
+  }
+});
+</script>
+</body>
+</html>
